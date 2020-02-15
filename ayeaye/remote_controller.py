@@ -24,8 +24,8 @@ class RemoteController:
         device_name = self._detect_device(message, self._device_phrase2name)
         order_name = self._detect_order(message, device_name, self._order_phrase2name)
         signal = self._extract_signal(device_name, order_name, self._order_name2signal)
-        response = self._send_signal(signal, self._irkit_settings)
-        return response
+        self._send_signal(signal, self._irkit_settings)
+        return dict(message='succeeded')
 
     @staticmethod
     def _detect_device(message, device_phrase2name):
@@ -64,8 +64,7 @@ class RemoteController:
             'X-Requested-With': 'python',
         }
 
-        r = requests.post(url, headers=headers, data=message)
-        return r
+        requests.post(url, headers=headers, data=message)
 
     @classmethod
     def build(cls):
