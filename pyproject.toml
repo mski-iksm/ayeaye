@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "ayeaye"
+version = "0.0.0"
+description = ""
+authors = ["mski_iksm <34547057+mski-iksm@users.noreply.github.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+Flask = "^2.1.1"
+requests = "^2.27.1"
+PyYAML = "^6.0"
+pyOpenSSL = "^22.0.0"
+
+[tool.poetry.dev-dependencies]
+yapf = "^0.32.0"
+flake8 = "^4.0.1"
+pytest = "^7.1.2"
+isort = "^5.10.1"
+mypy = "^0.942"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
