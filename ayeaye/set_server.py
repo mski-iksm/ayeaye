@@ -1,10 +1,10 @@
+from logging import getLogger
+
 import flask
 
 from ayeaye.remote_controller import RemoteController
 
-# routeとmethodごとにrecieverを設定する
-# 受け取ったデータを、処理するオブジェクトに投げ+返信を作成させる
-# TODO: 中身の実装はここには書かない
+logger = getLogger(__name__)
 
 
 def setup_app(app):
@@ -24,5 +24,5 @@ def setup_app(app):
         }
         posted_data = flask.request.get_json()
 
-        response = remote_controller.run(posted_data)
+        response = remote_controller.posted(posted_data)
         return response

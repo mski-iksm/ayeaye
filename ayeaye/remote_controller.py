@@ -1,112 +1,68 @@
-from typing import Dict, List
-import json
+import os
 
 import requests
 
-from ayeaye.setting_loader import get_signal_settings, get_irkit_settings, get_server_settings
+from ayeaye.secret_loader import get_nature_remo_secret_token
+from ayeaye.setting_loader import SignalSettings, make_signal_settings
 
 
 class RemoteController:
 
-    def __init__(self, device_phrase2name, order_phrase2name, order_name2signal, irkit_settings, server_settings):
-        self._device_phrase2name = device_phrase2name
-        self._order_phrase2name = order_phrase2name
-        self._order_name2signal = order_name2signal
-        self._irkit_settings = irkit_settings
-        self._server_settings = server_settings
-
-    def run(self, posted_data):
-        if posted_data['key'] != self._server_settings['key']:
-            return dict(message='invalid key')
-        return self._run(posted_data['text'])
-
-    def _run(self, message):
-        device_name = self._detect_device(message, self._device_phrase2name)
-        order_name = self._detect_order(message, device_name, self._order_phrase2name)
-        signal = self._extract_signal(device_name, order_name, self._order_name2signal)
-        self._send_signal(signal, self._irkit_settings)
-        return dict(message='succeeded')
-
-    @staticmethod
-    def _detect_device(message, device_phrase2name):
-        for device_phrase, device_name in device_phrase2name.items():
-            if device_phrase in message:
-                return device_name
-        return None
-
-    @staticmethod
-    def _detect_order(message, device_name, order_phrase2name):
-        if device_name not in order_phrase2name:
-            return None
-        for order_phrase, order_name in order_phrase2name[device_name].items():
-            if order_phrase in message:
-                return order_name
-        return None
-
-    @staticmethod
-    def _extract_signal(device_name, order_name, order_name2signal):
-        if device_name not in order_name2signal:
-            return None
-
-        if order_name not in order_name2signal[device_name]:
-            return None
-
-        return order_name2signal[device_name][order_name]
-
-    @staticmethod
-    def _send_signal(signal, irkit_settings):
-        url = f'http://{format(irkit_settings["url"])}/messages'
-        message = {'format': 'raw', 'freq': 38, 'data': signal}
-        message = json.dumps(message)
-
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'python',
-        }
-
-        requests.post(url, headers=headers, data=message)
+    def __init__(self, signal_settings: SignalSettings, gcp_project_id: str, secret_id: str) -> None:
+        self._signal_settings = signal_settings
+        self._gcp_project_id = gcp_project_id
+        self._secret_id = secret_id
 
     @classmethod
     def build(cls):
-        signal_settings = get_signal_settings()
-        device_phrase2name: Dict[str, str] = cls._build_device_phrase2name(signal_settings)
-        order_phrase2name: Dict[str, Dict[str, str]] = cls._build_order_phrase2name(signal_settings)
-        order_name2signal: Dict[str, Dict[str, List[int]]] = cls._build_order_name2signal(signal_settings)
+        datastore_namespace = os.environ['datastore_namespace']
+        datastore_kind = os.environ['datastore_kind']
+        datastore_id = os.environ['datastore_id']
+        gcp_project_id = os.environ['gcp_project_id']
+        secret_id = os.environ['secret_id']
 
-        irkit_settings = get_irkit_settings()
-        server_settings = get_server_settings()
+        signal_settings = make_signal_settings(datastore_namespace, datastore_kind, datastore_id)
+        return cls(signal_settings=signal_settings, gcp_project_id=gcp_project_id, secret_id=secret_id)
 
-        return cls(device_phrase2name, order_phrase2name, order_name2signal, irkit_settings, server_settings)
+    def posted(self, posted_data):
+        # TODO: user認証
 
-    @staticmethod
-    def _build_device_phrase2name(signal_settings):
-        device_phrase2name = {}
-        for device_name, v in signal_settings.items():
-            device_phrase2name.update({pat: device_name for pat in v['device_pattern']})
-        return device_phrase2name
+        message = posted_data['text']
 
-    @staticmethod
-    def _build_order_phrase2name(signal_settings):
-        order_phrase2name = {}
-        for device_name, v in signal_settings.items():
+        device_name = self._detect_device(message)
+        order_name = self._detect_order(message, device_name)
+        signal_id = self._extract_signal_id(device_name, order_name)
 
-            device_order_phrase2name = {}
-            for order_name, order_value in v['orders'].items():
-                device_order_phrase2name.update({pat: order_name for pat in order_value['pattern']})
+        self._send_signal(signal_id=signal_id)
+        return dict(message=f'succeeded signal_id={signal_id}')
 
-            order_phrase2name[device_name] = device_order_phrase2name
+    def _detect_device(self, message: str) -> str:
+        for device_name, device_phrase_list in self._signal_settings.device_names.items():
+            for device_phrase in device_phrase_list:
+                if device_phrase in message:
+                    return device_name
+        raise ValueError(f'message `{message}` does not contain valid device phrase.')
 
-        return order_phrase2name
+    def _detect_order(self, message: str, device_name: str) -> str:
+        order_names_dict = self._signal_settings.order_names[device_name]
 
-    @staticmethod
-    def _build_order_name2signal(signal_settings):
-        order_name2signal = {}
-        for device_name, v in signal_settings.items():
+        for order_name, order_phrase_list in order_names_dict.items():
+            for order_phrase in order_phrase_list:
+                if order_phrase in message:
+                    return order_name
+        raise ValueError(f'message `{message}` does not contain valid order phrase.')
 
-            device_order_name2signal = {}
-            for order_name, order_value in v['orders'].items():
-                device_order_name2signal[order_name] = order_value['signal']
+    def _extract_signal_id(self, device_name: str, order_name: str):
+        return self._signal_settings.order_signal[device_name][order_name]
 
-            order_name2signal[device_name] = device_order_name2signal
+    def _send_signal(self, signal_id: str):
+        # TODO: ユーザーごとにsecret token切り替え
+        nature_remo_secret_token = get_nature_remo_secret_token(gcp_project_id=self._gcp_project_id, secret_id=self._secret_id)
 
-        return order_name2signal
+        url = f'https://api.nature.global/1/signals/{signal_id}/send'
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {nature_remo_secret_token}',
+        }
+
+        requests.post(url, headers=headers)
