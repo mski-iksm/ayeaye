@@ -1,5 +1,5 @@
-from google.cloud import secretmanager
 import google_crc32c
+from google.cloud import secretmanager
 
 
 def get_nature_remo_secret_token(gcp_project_id: str, secret_id: str) -> str:

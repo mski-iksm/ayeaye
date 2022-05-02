@@ -1,7 +1,7 @@
-from typing import Dict, List, Tuple
-import yaml
 import dataclasses
+from typing import Dict, List, Tuple
 
+import yaml
 from google.cloud import datastore
 
 

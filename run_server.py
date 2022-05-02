@@ -1,7 +1,7 @@
 from logging import getLogger
 
-import flask
 import fire
+import flask
 
 from ayeaye.set_server import setup_app
 

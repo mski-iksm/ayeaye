@@ -1,5 +1,7 @@
 import os
+
 import requests
+
 from ayeaye.secret_loader import get_nature_remo_secret_token
 from ayeaye.setting_loader import SignalSettings, make_signal_settings
 
