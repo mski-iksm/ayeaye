@@ -16,6 +16,6 @@ python run_server.py --port-number=<port-number>
 
 ## リモコン操作方法
 ```bash
-curl -X GET "https://api.nature.global/1/appliances/{appliances_id}/signals" -H "accept: application/json" -H "Authorization: Bearer {nature_remo_token}"
+curl -X POST -H "Content-Type: application/json" -d '{"text":"テレビをつけて"}' https://0.0.0.0:7888/incoming --insecure
 ```
 
